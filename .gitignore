@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+*.db
+uploads/*
+!uploads/.gitkeep
+outputs/*
+!outputs/.gitkeep
+.venv/
+venv/
+logs/
+server.out.log
+server.err.log
+.playwright-cli/
+.claude/
+chatwork_accessibility_dump.txt

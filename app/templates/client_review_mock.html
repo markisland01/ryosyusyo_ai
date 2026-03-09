@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}顧客確認モック - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<section class="mock-hero">
+    <div>
+        <h1>顧客確認画面モック</h1>
+        <p class="hint">御社で一次確認した結果をお客様に確認してもらい、差分だけ承認・修正依頼してもらう想定です。</p>
+    </div>
+    <div class="actions">
+        <a href="/ops-mock" class="btn">運用モック</a>
+        <a href="/upload" class="btn btn-primary">顧客アップロード画面</a>
+    </div>
+</section>
+
+<section class="client-review-layout">
+    <article class="card">
+        <div class="card-header">
+            <div>
+                <h2>確認待ち一覧</h2>
+                <p class="hint">変更点があるものだけ目立たせて、お客様側の確認時間を短くする。</p>
+            </div>
+            <span class="status status-ai_analyzing">2件未確認</span>
+        </div>
+
+        <div class="client-review-list">
+            <div class="client-review-item active">
+                <div>
+                    <strong>2026/03/09 Pat登美ヶ丘第2駐車場</strong>
+                    <p class="hint">変更点 1件 / 金額 700円</p>
+                </div>
+                <span class="mock-pill">勘定科目変更あり</span>
+            </div>
+            <div class="client-review-item">
+                <div>
+                    <strong>2026/03/09 びっくりドンキー</strong>
+                    <p class="hint">変更点 2件 / 金額 4,860円</p>
+                </div>
+                <span class="mock-pill">支払方法・科目変更</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="card">
+        <div class="card-header">
+            <div>
+                <h2>差分確認</h2>
+                <p class="hint">AI初期値、御社確認後の値、お客様最終コメントを並べて確認する。</p>
+            </div>
+            <span class="status status-completed">一次確認済み</span>
+        </div>
+
+        <div class="client-review-detail">
+            <div class="mock-image-frame client-review-image">
+                <div class="mock-image-placeholder">receipt_001.png</div>
+            </div>
+
+            <div class="client-diff-panel">
+                <div class="client-diff-table">
+                    <div class="client-diff-row client-diff-head">
+                        <span>項目</span>
+                        <span>AI初期値</span>
+                        <span>御社確認後</span>
+                    </div>
+                    <div class="client-diff-row">
+                        <span>店舗名</span>
+                        <span>Pat登美ヶ丘第2駐車場</span>
+                        <span>Pat登美ヶ丘第2駐車場</span>
+                    </div>
+                    <div class="client-diff-row">
+                        <span>金額</span>
+                        <span>700</span>
+                        <span>700</span>
+                    </div>
+                    <div class="client-diff-row client-diff-changed">
+                        <span>勘定科目</span>
+                        <span>会議費</span>
+                        <span>旅費交通費</span>
+                    </div>
+                    <div class="client-diff-row">
+                        <span>支払方法</span>
+                        <span>現金</span>
+                        <span>現金</span>
+                    </div>
+                </div>
+
+                <div class="client-comment-box">
+                    <label>お客様コメント</label>
+                    <textarea rows="4">駐車場なので旅費交通費で問題ありません。今後も同様でお願いします。</textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" type="button">この内容で承認</button>
+                    <button class="btn" type="button">修正依頼を出す</button>
+                </div>
+            </div>
+        </div>
+    </article>
+</section>
+{% endblock %}

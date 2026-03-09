@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}長いレシート専用アップロード - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<section class="long-upload-hero card">
+    <h1>長いレシート専用アップロード</h1>
+    <p class="hint">長いレシートは、上から下までなぞるのではなく、画面に収まる範囲ごとに止めて撮影してください。</p>
+    <div class="long-upload-steps">
+        <div class="long-step">
+            <strong>1. 上部を撮る</strong>
+            <p>レシート上部を画面いっぱいに入れて 1 秒ほど止めます。</p>
+        </div>
+        <div class="long-step">
+            <strong>2. 中段を撮る</strong>
+            <p>少し重なるように下へずらして、同じように 1 秒ほど止めます。</p>
+        </div>
+        <div class="long-step">
+            <strong>3. 下段を撮る</strong>
+            <p>合計金額まで入るように同じ動きを繰り返します。</p>
+        </div>
+    </div>
+    <div class="actions">
+        <a href="/upload" class="btn">通常スキャンへ戻る</a>
+    </div>
+</section>
+
+<div class="upload-section">
+    <div class="card">
+        <h2>カメラで長いレシートを撮影</h2>
+        <p>各位置で一瞬止めながら撮影してください。上下の内容が少し重なると認識しやすくなります。</p>
+        <div class="long-tip-list">
+            <span class="mock-pill">真上から撮る</span>
+            <span class="mock-pill">各位置で止める</span>
+            <span class="mock-pill">少し重ねる</span>
+            <span class="mock-pill">影を入れない</span>
+        </div>
+        <div id="camera-container" style="display:none">
+            <video id="camera-preview" autoplay playsinline style="width:100%;max-height:420px;border-radius:8px;background:#000"></video>
+            <div id="camera-timer" style="text-align:center;font-size:1.2rem;font-weight:700;margin:8px 0;display:none">
+                <span id="rec-indicator" style="color:#e74c3c">REC</span> <span id="rec-time">00:00</span>
+            </div>
+            <div class="form-actions">
+                <button id="start-rec-btn" class="btn btn-primary" onclick="startRecording()">録画開始</button>
+                <button id="stop-rec-btn" class="btn" onclick="stopRecording()" style="display:none" disabled>録画停止</button>
+                <button id="close-camera-btn" class="btn" onclick="closeCamera()">カメラを閉じる</button>
+            </div>
+        </div>
+        <button id="open-camera-btn" class="btn btn-primary" onclick="openCamera()">カメラを起動</button>
+        <p id="camera-error" class="error" style="display:none"></p>
+    </div>
+
+    <div class="card">
+        <h2>動画ファイルをアップロード</h2>
+        <p>すでに撮影済みの長いレシート動画があれば、そのままアップロードできます。</p>
+        <div id="drop-zone" class="drop-zone long-drop-zone">
+            <p>長いレシート動画をドラッグ&ドロップ</p>
+            <p>または</p>
+            <input type="file" id="file-input" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm" style="display:none">
+            <button class="btn" onclick="document.getElementById('file-input').click()">ファイルを選択</button>
+        </div>
+        <p class="hint">対応形式: MP4, MOV, AVI, WebM / 最大500MB</p>
+    </div>
+</div>
+
+<div id="upload-progress" class="card" style="display:none">
+    <h2>アップロード中...</h2>
+    <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+    </div>
+    <p id="progress-text">0%</p>
+</div>
+
+<div id="processing-status" class="card" style="display:none">
+    <h2>処理状況</h2>
+    <p id="status-text">処理を開始しています...</p>
+    <div class="progress-bar">
+        <div id="status-fill" class="progress-fill" style="width: 0%"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+let cameraStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recTimerInterval = null;
+let recStartTime = 0;
+
+async function openCamera() {
+    const errorEl = document.getElementById('camera-error');
+    errorEl.style.display = 'none';
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+        });
+        document.getElementById('camera-preview').srcObject = cameraStream;
+        document.getElementById('camera-container').style.display = 'block';
+        document.getElementById('open-camera-btn').style.display = 'none';
+    } catch (err) {
+        errorEl.textContent = 'カメラにアクセスできません: ' + err.message;
+        errorEl.style.display = 'block';
+    }
+}
+
+function closeCamera() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+    }
+    clearInterval(recTimerInterval);
+    document.getElementById('camera-preview').srcObject = null;
+    document.getElementById('camera-container').style.display = 'none';
+    document.getElementById('open-camera-btn').style.display = '';
+    document.getElementById('camera-timer').style.display = 'none';
+    document.getElementById('start-rec-btn').style.display = '';
+    document.getElementById('stop-rec-btn').style.display = 'none';
+}
+
+function startRecording() {
+    recordedChunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    mediaRecorder = new MediaRecorder(cameraStream, { mimeType });
+
+    mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+        clearInterval(recTimerInterval);
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const file = new File([blob], 'long-receipt-recording.webm', { type: 'video/webm' });
+        closeCamera();
+        uploadFile(file);
+    };
+
+    mediaRecorder.start(1000);
+    recStartTime = Date.now();
+    document.getElementById('camera-timer').style.display = 'block';
+    document.getElementById('start-rec-btn').style.display = 'none';
+    document.getElementById('stop-rec-btn').style.display = '';
+    document.getElementById('stop-rec-btn').disabled = false;
+
+    recTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+        const min = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const sec = String(elapsed % 60).padStart(2, '0');
+        document.getElementById('rec-time').textContent = `${min}:${sec}`;
+    }, 500);
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
+}
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) uploadFile(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) uploadFile(e.target.files[0]);
+});
+
+async function uploadFile(file) {
+    const progressSection = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    progressSection.style.display = 'block';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/videos/upload');
+
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            progressFill.style.width = pct + '%';
+            progressText.textContent = pct + '%';
+        }
+    });
+
+    xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+            const video = JSON.parse(xhr.responseText);
+            progressSection.style.display = 'none';
+            pollStatus(video.id);
+        } else {
+            progressText.textContent = 'アップロードに失敗しました';
+            progressFill.style.backgroundColor = '#e74c3c';
+        }
+    });
+
+    xhr.addEventListener('error', () => {
+        progressText.textContent = 'ネットワークエラーが発生しました';
+    });
+
+    xhr.send(formData);
+}
+
+async function pollStatus(videoId) {
+    const statusSection = document.getElementById('processing-status');
+    const statusText = document.getElementById('status-text');
+    const statusFill = document.getElementById('status-fill');
+    statusSection.style.display = 'block';
+
+    const statusSteps = {
+        uploaded: { label: '受付済み', progress: 10 },
+        extracting_frames: { label: 'フレーム抽出中...', progress: 25 },
+        detecting_receipts: { label: '候補抽出中...', progress: 40 },
+        ocr_processing: { label: 'OCR処理中...', progress: 60 },
+        ai_waiting: { label: 'AI待機中...', progress: 72 },
+        ai_analyzing: { label: 'AI解析中...', progress: 85 },
+        retrying: { label: '再試行中...', progress: 88 },
+        completed: { label: '処理完了', progress: 100 },
+        failed: { label: 'エラーが発生しました', progress: 100 },
+    };
+
+    const poll = async () => {
+        try {
+            const res = await fetch(`/api/videos/${videoId}/status`);
+            const data = await res.json();
+            const step = statusSteps[data.status] || { label: data.status, progress: 50 };
+
+            statusText.textContent = step.label;
+            if (data.total_frames) {
+                statusText.textContent += ` (${data.processed_frames ?? 0}/${data.total_frames})`;
+            }
+            statusFill.style.width = step.progress + '%';
+
+            if (data.status === 'completed') {
+                window.location.href = `/results/${videoId}`;
+            } else if (data.status === 'failed') {
+                statusFill.style.backgroundColor = '#e74c3c';
+                statusText.textContent += `: ${data.error_message || '不明なエラー'}`;
+            } else {
+                setTimeout(poll, 2000);
+            }
+        } catch {
+            setTimeout(poll, 3000);
+        }
+    };
+
+    poll();
+}
+</script>
+{% endblock %}

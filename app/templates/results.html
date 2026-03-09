@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% block title %}解析結果 - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<h1>解析結果</h1>
+
+<div class="result-actions">
+    <button id="confirm-all-btn" class="btn btn-primary" onclick="confirmAll()">すべて確認</button>
+    <div class="export-group">
+        <label>出力形式</label>
+        <select id="export-format">
+            <option value="generic">汎用CSV</option>
+            <option value="yayoi">弥生会計</option>
+            <option value="freee">freee</option>
+            <option value="moneyforward">マネーフォワード</option>
+        </select>
+        <label>文字コード</label>
+        <select id="export-encoding">
+            <option value="utf-8-sig">UTF-8</option>
+            <option value="shift_jis">Shift_JIS</option>
+        </select>
+        <button class="btn" onclick="exportCSV()">CSVダウンロード</button>
+    </div>
+</div>
+
+<div id="receipts-list" class="receipts-grid">
+    <p class="loading">読み込み中...</p>
+</div>
+
+<div id="edit-modal" class="modal" style="display:none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>書類データ編集</h2>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-layout">
+                <div class="receipt-image-container" id="modal-image-container">
+                    <img id="modal-image" src="" alt="書類画像">
+                </div>
+                <form id="edit-form" class="edit-form">
+                    <input type="hidden" id="edit-receipt-id">
+
+                    <div class="form-group">
+                        <label>書類種別</label>
+                        <select id="edit-document-type" name="document_type">
+                            <option value="">--</option>
+                            <option value="receipt">領収書</option>
+                            <option value="credit_statement">カード明細</option>
+                            <option value="bankbook">銀行通帳</option>
+                            <option value="invoice">請求書</option>
+                            <option value="other">その他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>日付</label>
+                        <input type="date" id="edit-date" name="receipt_date">
+                    </div>
+                    <div class="form-group">
+                        <label>店舗名 / 摘要</label>
+                        <input type="text" id="edit-store" name="store_name">
+                    </div>
+                    <div class="form-group">
+                        <label>金額</label>
+                        <input type="number" id="edit-total" name="total_amount">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>入金額</label>
+                            <input type="number" id="edit-credit" name="credit_amount">
+                        </div>
+                        <div class="form-group">
+                            <label>出金額</label>
+                            <input type="number" id="edit-debit" name="debit_amount">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>残高</label>
+                        <input type="number" id="edit-balance" name="balance_amount">
+                    </div>
+                    <div class="form-group">
+                        <label>支払方法</label>
+                        <input type="text" id="edit-payment" name="payment_method">
+                    </div>
+                    <div class="form-group">
+                        <label>請求区分</label>
+                        <input type="text" id="edit-invoice-type" name="invoice_type">
+                    </div>
+                    <div class="form-group">
+                        <label>勘定科目</label>
+                        <input type="text" id="edit-account" name="account_category">
+                    </div>
+                    <div class="form-group">
+                        <label>登録番号</label>
+                        <input type="text" id="edit-reg-number" name="registration_number" placeholder="T0000000000000">
+                    </div>
+                    <div class="form-group">
+                        <label>摘要</label>
+                        <input type="text" id="edit-description" name="description">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" class="btn" onclick="closeModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const videoId = {{ video_id }};
+let receipts = [];
+
+document.addEventListener('DOMContentLoaded', loadReceipts);
+
+function receiptImagePath(index) {
+    return `/outputs/${videoId}/receipt_${String(index).padStart(3, '0')}.png`;
+}
+
+function normalizeOutputPath(path, fallbackIndex) {
+    const rawPath = String(path || '').replaceAll('\\', '/');
+    const marker = '/outputs/';
+    const markerIndex = rawPath.indexOf(marker);
+    if (markerIndex >= 0) return rawPath.slice(markerIndex);
+    const relativeMarker = 'outputs/';
+    const relativeIndex = rawPath.indexOf(relativeMarker);
+    if (relativeIndex >= 0) return '/' + rawPath.slice(relativeIndex);
+    return receiptImagePath(fallbackIndex);
+}
+
+function receiptImageUrl(item, fallbackIndex) {
+    return normalizeOutputPath(item.image_path, fallbackIndex);
+}
+
+function receiptSegmentUrls(item, fallbackIndex) {
+    const paths = Array.isArray(item.segment_image_paths) && item.segment_image_paths.length > 0
+        ? item.segment_image_paths
+        : [item.image_path || receiptImagePath(fallbackIndex)];
+    return paths.map((path) => normalizeOutputPath(path, fallbackIndex));
+}
+
+function fallbackImageHandler(img) {
+    img.onerror = null;
+    img.src = '/static/images/no-image.svg';
+}
+
+function documentTypeLabel(value) {
+    const labels = {
+        receipt: '領収書',
+        credit_statement: 'カード明細',
+        bankbook: '銀行通帳',
+        invoice: '請求書',
+        other: 'その他',
+    };
+    return labels[value] || value || '-';
+}
+
+function amountLabel(item) {
+    if (item.document_type === 'bankbook') {
+        const parts = [];
+        if (item.credit_amount != null) parts.push(`入金 ¥${Number(item.credit_amount).toLocaleString()}`);
+        if (item.debit_amount != null) parts.push(`出金 ¥${Number(item.debit_amount).toLocaleString()}`);
+        if (item.balance_amount != null) parts.push(`残高 ¥${Number(item.balance_amount).toLocaleString()}`);
+        return parts.join(' / ') || '金額未設定';
+    }
+    return `¥${Number(item.total_amount || 0).toLocaleString()}`;
+}
+
+async function loadReceipts() {
+    const container = document.getElementById('receipts-list');
+    try {
+        const res = await fetch(`/api/videos/${videoId}/receipts`);
+        const data = await res.json();
+        receipts = data.receipts;
+
+        if (receipts.length === 0) {
+            container.innerHTML = '<p class="empty">まだ書類は抽出されていません。</p>';
+            return;
+        }
+
+        container.innerHTML = receipts.map((r, index) => `
+            <div class="receipt-card ${r.is_confirmed ? 'confirmed' : ''} ${(r.confidence_score || 0) < 0.7 ? 'low-confidence' : ''}" data-id="${r.id}">
+                <div class="receipt-image">
+                    <img src="${receiptImageUrl(r, index)}" alt="書類画像" onerror="fallbackImageHandler(this)">
+                </div>
+                <div class="receipt-data">
+                    <p><strong>${r.store_name || '(店舗名未設定)'}</strong></p>
+                    <p class="category">${documentTypeLabel(r.document_type)}</p>
+                    <p class="amount">${amountLabel(r)}</p>
+                    <p>${r.receipt_date || '日付未設定'}</p>
+                    <p>${r.account_category || '-'}</p>
+                    <p>${r.description || ''}</p>
+                    ${(r.segment_image_paths || []).length > 1 ? `<p class="hint">長いレシート: ${(r.segment_image_paths || []).length}コマ</p>` : ''}
+                    <p class="confidence">信頼度: ${Math.round((r.confidence_score || 0) * 100)}%</p>
+                </div>
+                <div class="receipt-actions">
+                    <button class="btn btn-sm" onclick="openEditModal(${r.id})">編集</button>
+                    ${r.is_confirmed ? '<span class="confirmed-badge">確認済み</span>' : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch {
+        container.innerHTML = '<p class="error">データの取得に失敗しました。</p>';
+    }
+}
+
+function openEditModal(receiptId) {
+    const r = receipts.find(item => item.id === receiptId);
+    if (!r) return;
+
+    document.getElementById('edit-receipt-id').value = r.id;
+    document.getElementById('edit-document-type').value = r.document_type || '';
+    document.getElementById('edit-date').value = r.receipt_date || '';
+    document.getElementById('edit-store').value = r.store_name || '';
+    document.getElementById('edit-total').value = r.total_amount ?? '';
+    document.getElementById('edit-credit').value = r.credit_amount ?? '';
+    document.getElementById('edit-debit').value = r.debit_amount ?? '';
+    document.getElementById('edit-balance').value = r.balance_amount ?? '';
+    document.getElementById('edit-payment').value = r.payment_method || '';
+    document.getElementById('edit-reg-number').value = r.registration_number || '';
+    document.getElementById('edit-invoice-type').value = r.invoice_type || '';
+    document.getElementById('edit-account').value = r.account_category || '';
+    document.getElementById('edit-description').value = r.description || '';
+
+    const idx = receipts.indexOf(r);
+    const segmentUrls = receiptSegmentUrls(r, idx);
+    const modalImage = document.getElementById('modal-image');
+    modalImage.onerror = () => fallbackImageHandler(modalImage);
+    modalImage.src = segmentUrls[0];
+
+    const container = document.getElementById('modal-image-container');
+    const previousStrip = document.getElementById('segment-strip');
+    if (previousStrip) previousStrip.remove();
+
+    if (segmentUrls.length > 1) {
+        const strip = document.createElement('div');
+        strip.id = 'segment-strip';
+        strip.style.display = 'flex';
+        strip.style.gap = '8px';
+        strip.style.marginTop = '12px';
+        strip.style.flexWrap = 'wrap';
+
+        segmentUrls.forEach((url, segmentIndex) => {
+            const thumb = document.createElement('img');
+            thumb.src = url;
+            thumb.alt = `segment-${segmentIndex + 1}`;
+            thumb.style.width = '72px';
+            thumb.style.height = '96px';
+            thumb.style.objectFit = 'contain';
+            thumb.style.cursor = 'pointer';
+            thumb.style.border = segmentIndex === 0 ? '2px solid #2563eb' : '1px solid #cbd5e1';
+            thumb.style.borderRadius = '6px';
+            thumb.onclick = () => {
+                modalImage.src = url;
+                Array.from(strip.children).forEach((child, index) => {
+                    child.style.border = index === segmentIndex ? '2px solid #2563eb' : '1px solid #cbd5e1';
+                });
+            };
+            strip.appendChild(thumb);
+        });
+        container.appendChild(strip);
+    }
+
+    document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+}
+
+document.getElementById('edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-receipt-id').value;
+    const formData = new FormData(e.target);
+    const data = {};
+
+    for (const [key, value] of formData.entries()) {
+        if (value === '') continue;
+        if (['total_amount', 'balance_amount', 'debit_amount', 'credit_amount'].includes(key)) {
+            data[key] = parseInt(value, 10);
+        } else {
+            data[key] = value;
+        }
+    }
+
+    const res = await fetch(`/api/receipts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+
+    if (res.ok) {
+        closeModal();
+        loadReceipts();
+    } else {
+        alert('保存に失敗しました');
+    }
+});
+
+async function confirmAll() {
+    const ids = receipts.map(r => r.id);
+    const res = await fetch('/api/receipts/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receipt_ids: ids }),
+    });
+    if (res.ok) {
+        loadReceipts();
+        alert('すべて確認しました');
+    }
+}
+
+function exportCSV() {
+    const format = document.getElementById('export-format').value;
+    const encoding = document.getElementById('export-encoding').value;
+    window.location.href = `/api/export/csv?video_id=${videoId}&format=${format}&encoding=${encoding}`;
+}
+</script>
+{% endblock %}

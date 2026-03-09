@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}履歴 - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<h1>処理履歴</h1>
+
+<div class="actions">
+    <a href="/upload" class="btn btn-primary">スキャンを開始</a>
+    <a href="/rules" class="btn">ルール設定</a>
+</div>
+
+<p class="hint">対応書類: 領収書、クレジットカード明細、銀行通帳</p>
+
+<h2>アップロード履歴</h2>
+<div id="history-list" class="card-list">
+    <p class="loading">読み込み中...</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const container = document.getElementById('history-list');
+    try {
+        const res = await fetch('/api/videos/');
+        const data = await res.json();
+
+        if (data.videos.length === 0) {
+            container.innerHTML = '<p class="empty">まだ書類動画はアップロードされていません。</p>';
+            return;
+        }
+
+        container.innerHTML = data.videos.map(v => `
+            <div class="card">
+                <div class="card-header">
+                    <span class="filename">${v.original_filename}</span>
+                    <span class="status status-${v.status}">${statusLabel(v.status)}</span>
+                </div>
+                <div class="card-body">
+                    <p>抽出件数: ${v.detected_receipts ?? '-'}</p>
+                    <p>アップロード日時: ${new Date(v.created_at).toLocaleString('ja-JP')}</p>
+                    ${v.processed_frames != null && v.total_frames ? `<p>進捗: ${v.processed_frames} / ${v.total_frames}</p>` : ''}
+                    ${v.error_message ? `<p class="error">${v.error_message}</p>` : ''}
+                </div>
+                <div class="card-actions">
+                    ${v.status === 'completed' ? `<a href="/results/${v.id}" class="btn btn-sm">結果を見る</a>` : ''}
+                    ${['processing', 'extracting_frames', 'detecting_receipts', 'ocr_processing', 'ai_waiting', 'ai_analyzing', 'retrying'].includes(v.status) ? '<span class="processing-indicator">処理中...</span>' : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = '<p class="error">データの取得に失敗しました。</p>';
+    }
+});
+
+function statusLabel(status) {
+    const labels = {
+        uploaded: '受付済み',
+        processing: '処理中',
+        extracting_frames: 'フレーム抽出中',
+        detecting_receipts: '候補抽出中',
+        ocr_processing: 'OCR処理中',
+        ai_waiting: 'AI待機中',
+        ai_analyzing: 'AI解析中',
+        retrying: '再試行中',
+        completed: '完了',
+        failed: 'エラー',
+    };
+    return labels[status] || status;
+}
+</script>
+{% endblock %}

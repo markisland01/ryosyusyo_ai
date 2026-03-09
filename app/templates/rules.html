@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}ルール設定 - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<div class="rules-page">
+    <section class="card rules-form-card">
+        <h1>ルール設定</h1>
+        <p class="hint">請求区分、支払方法、勘定科目をキーワードで自動補正します。</p>
+
+        <form id="rule-form" class="edit-form">
+            <input type="hidden" id="rule-id">
+            <div class="form-group">
+                <label for="rule-type">ルール種別</label>
+                <select id="rule-type" required>
+                    <option value="invoice_type">請求区分</option>
+                    <option value="payment_method">支払方法</option>
+                    <option value="account_category">勘定科目</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="document-type">書類種別</label>
+                <select id="document-type">
+                    <option value="">すべて</option>
+                    <option value="receipt">領収書</option>
+                    <option value="invoice">請求書</option>
+                    <option value="credit_statement">クレジットカード明細</option>
+                    <option value="bankbook">銀行通帳</option>
+                    <option value="other">その他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="pattern">キーワード</label>
+                <input id="pattern" type="text" placeholder="例: 駐車場" required>
+            </div>
+            <div class="form-group">
+                <label for="target-value">設定値</label>
+                <input id="target-value" type="text" placeholder="例: 旅費交通費" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="priority">優先度</label>
+                    <input id="priority" type="number" value="100">
+                </div>
+                <div class="form-group checkbox-group">
+                    <label><input id="enabled" type="checkbox" checked> 有効</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="notes">メモ</label>
+                <input id="notes" type="text" placeholder="任意">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn" id="reset-form">リセット</button>
+            </div>
+            <p id="rule-form-message" class="hint"></p>
+        </form>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <h2>登録済みルール</h2>
+            <button class="btn btn-sm" id="reload-rules">再読込</button>
+        </div>
+        <div id="rules-list" class="rules-list">
+            <p class="loading">読み込み中...</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ruleTypeLabels = {
+    invoice_type: '請求区分',
+    payment_method: '支払方法',
+    account_category: '勘定科目',
+};
+
+const form = document.getElementById('rule-form');
+const messageEl = document.getElementById('rule-form-message');
+const listEl = document.getElementById('rules-list');
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadRules();
+});
+
+document.getElementById('reload-rules').addEventListener('click', loadRules);
+document.getElementById('reset-form').addEventListener('click', resetForm);
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const ruleId = document.getElementById('rule-id').value;
+    const payload = {
+        rule_type: document.getElementById('rule-type').value,
+        document_type: document.getElementById('document-type').value || null,
+        pattern: document.getElementById('pattern').value.trim(),
+        target_value: document.getElementById('target-value').value.trim(),
+        priority: Number(document.getElementById('priority').value || 100),
+        enabled: document.getElementById('enabled').checked,
+        notes: document.getElementById('notes').value.trim() || null,
+    };
+
+    const method = ruleId ? 'PUT' : 'POST';
+    const url = ruleId ? `/api/rules/${ruleId}` : '/api/rules/';
+
+    const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        messageEl.textContent = '保存に失敗しました。';
+        messageEl.className = 'error';
+        return;
+    }
+
+    resetForm();
+    messageEl.textContent = '保存しました。';
+    messageEl.className = 'hint';
+    await loadRules();
+});
+
+async function loadRules() {
+    const res = await fetch('/api/rules/');
+    if (!res.ok) {
+        listEl.innerHTML = '<p class="error">ルールの取得に失敗しました。</p>';
+        return;
+    }
+
+    const data = await res.json();
+    if (data.rules.length === 0) {
+        listEl.innerHTML = '<p class="empty">まだルールは登録されていません。</p>';
+        return;
+    }
+
+    listEl.innerHTML = data.rules.map(rule => `
+        <article class="rule-item ${rule.enabled ? '' : 'rule-item-disabled'}">
+            <div class="rule-item-header">
+                <div>
+                    <strong>${ruleTypeLabels[rule.rule_type] || rule.rule_type}</strong>
+                    <span class="status ${rule.enabled ? 'status-completed' : 'status-failed'}">${rule.enabled ? '有効' : '無効'}</span>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-sm" onclick="editRule(${rule.id})">編集</button>
+                    <button class="btn btn-sm" onclick="removeRule(${rule.id})">削除</button>
+                </div>
+            </div>
+            <p><strong>書類種別:</strong> ${formatDocumentType(rule.document_type)}</p>
+            <p><strong>キーワード:</strong> ${escapeHtml(rule.pattern)}</p>
+            <p><strong>設定値:</strong> ${escapeHtml(rule.target_value)}</p>
+            <p><strong>優先度:</strong> ${rule.priority}</p>
+            ${rule.notes ? `<p><strong>メモ:</strong> ${escapeHtml(rule.notes)}</p>` : ''}
+        </article>
+    `).join('');
+
+    window.currentRules = data.rules;
+}
+
+function editRule(ruleId) {
+    const rule = (window.currentRules || []).find(item => item.id === ruleId);
+    if (!rule) return;
+
+    document.getElementById('rule-id').value = rule.id;
+    document.getElementById('rule-type').value = rule.rule_type;
+    document.getElementById('document-type').value = rule.document_type || '';
+    document.getElementById('pattern').value = rule.pattern;
+    document.getElementById('target-value').value = rule.target_value;
+    document.getElementById('priority').value = rule.priority;
+    document.getElementById('enabled').checked = rule.enabled;
+    document.getElementById('notes').value = rule.notes || '';
+    messageEl.textContent = '編集中です。';
+    messageEl.className = 'hint';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function removeRule(ruleId) {
+    if (!confirm('このルールを削除しますか。')) return;
+
+    const res = await fetch(`/api/rules/${ruleId}`, { method: 'DELETE' });
+    if (!res.ok) {
+        listEl.insertAdjacentHTML('afterbegin', '<p class="error">削除に失敗しました。</p>');
+        return;
+    }
+    await loadRules();
+}
+
+function resetForm() {
+    form.reset();
+    document.getElementById('rule-id').value = '';
+    document.getElementById('priority').value = 100;
+    document.getElementById('enabled').checked = true;
+    messageEl.textContent = '';
+    messageEl.className = 'hint';
+}
+
+function formatDocumentType(documentType) {
+    const labels = {
+        receipt: '領収書',
+        invoice: '請求書',
+        credit_statement: 'クレジットカード明細',
+        bankbook: '銀行通帳',
+        other: 'その他',
+    };
+    return labels[documentType] || 'すべて';
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+</script>
+{% endblock %}

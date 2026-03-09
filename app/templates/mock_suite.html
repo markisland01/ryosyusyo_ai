@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+{% block title %}モック集 - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<section class="mock-suite-hero">
+    <div>
+        <h1>モック集</h1>
+        <p class="hint">管理者、在宅ワーカー、顧客の画面を 1 ファイルにまとめた静的モックです。クリックでダミーデータが切り替わります。</p>
+    </div>
+    <div class="actions">
+        <a href="/upload" class="btn">顧客アップロード</a>
+        <a href="/rules" class="btn">ルール設定</a>
+    </div>
+</section>
+
+<section class="mock-suite-tabs" id="mock-tabs">
+    <button class="mock-tab active" data-role="admin" type="button">管理者</button>
+    <button class="mock-tab" data-role="worker" type="button">在宅ワーカー</button>
+    <button class="mock-tab" data-role="client" type="button">顧客</button>
+</section>
+
+<section class="mock-suite-panels">
+    <article class="card mock-panel active" data-panel="admin">
+        <div class="card-header">
+            <div>
+                <h2>管理者ダッシュボード</h2>
+                <p class="hint">顧客ごとの滞留状況、承認待ち、ルール候補を確認する画面。</p>
+            </div>
+            <span class="mock-pill" id="admin-summary">全体 84 件</span>
+        </div>
+
+        <div class="mock-suite-admin-layout">
+            <aside class="mock-suite-list" id="admin-list"></aside>
+            <div class="mock-suite-detail" id="admin-detail"></div>
+        </div>
+    </article>
+
+    <article class="card mock-panel" data-panel="worker">
+        <div class="card-header">
+            <div>
+                <h2>在宅ワーカー確認画面</h2>
+                <p class="hint">担当キューから明細を選び、画像と解析結果を見ながら一次確認する画面。</p>
+            </div>
+            <span class="mock-pill" id="worker-summary">担当 3 件</span>
+        </div>
+
+        <div class="mock-suite-worker-layout">
+            <aside class="mock-suite-list" id="worker-list"></aside>
+            <div class="mock-suite-detail" id="worker-detail"></div>
+        </div>
+    </article>
+
+    <article class="card mock-panel" data-panel="client">
+        <div class="card-header">
+            <div>
+                <h2>顧客確認画面</h2>
+                <p class="hint">変更点がある項目だけを表示し、お客様に承認または修正依頼してもらう画面。</p>
+            </div>
+            <span class="mock-pill" id="client-summary">確認待ち 2 件</span>
+        </div>
+
+        <div class="mock-suite-client-layout">
+            <aside class="mock-suite-list" id="client-list"></aside>
+            <div class="mock-suite-detail" id="client-detail"></div>
+        </div>
+    </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const mockData = {
+    admin: {
+        summary: '全体 84 件',
+        items: [
+            {
+                id: 'a1',
+                name: '株式会社サンプル商事',
+                status: '滞留注意',
+                counts: { pending: 26, reviewing: 7, approval: 3 },
+                assignees: '山田 / 佐藤',
+                badgeClass: 'status-ai_analyzing',
+                detail: {
+                    title: '株式会社サンプル商事',
+                    cards: [
+                        ['未確認', '26件'],
+                        ['確認中', '7件'],
+                        ['承認待ち', '3件'],
+                        ['本日納品', '41件'],
+                    ],
+                    notes: [
+                        '駐車場系の勘定科目修正が増加しています。',
+                        '在宅ワーカー 1 名の追加アサインが必要です。',
+                    ],
+                    candidates: [
+                        '「びっくりドンキー」を 4 回連続で 福利厚生費 に修正',
+                        '「Pat駐車場」を 3 回連続で 旅費交通費 に修正',
+                    ],
+                },
+            },
+            {
+                id: 'a2',
+                name: '西日本フードサービス',
+                status: '順調',
+                counts: { pending: 18, reviewing: 4, approval: 1 },
+                assignees: '高橋',
+                badgeClass: 'status-completed',
+                detail: {
+                    title: '西日本フードサービス',
+                    cards: [
+                        ['未確認', '18件'],
+                        ['確認中', '4件'],
+                        ['承認待ち', '1件'],
+                        ['本日納品', '76件'],
+                    ],
+                    notes: [
+                        '飲食店関連のルールが安定しており、修正率が低下しています。',
+                    ],
+                    candidates: [
+                        '「仕入」キーワードを原材料費へ寄せる候補',
+                    ],
+                },
+            },
+            {
+                id: 'a3',
+                name: '青葉建設',
+                status: '要調整',
+                counts: { pending: 40, reviewing: 8, approval: 6 },
+                assignees: '未割当あり',
+                badgeClass: 'status-failed',
+                detail: {
+                    title: '青葉建設',
+                    cards: [
+                        ['未確認', '40件'],
+                        ['確認中', '8件'],
+                        ['承認待ち', '6件'],
+                        ['本日納品', '12件'],
+                    ],
+                    notes: [
+                        '工具・資材の科目揺れが大きく、顧客別ルールの追加が必要です。',
+                        '承認待ちに 48 時間超過のデータがあります。',
+                    ],
+                    candidates: [
+                        '「コーナン」を 工具器具備品 へ寄せる候補',
+                        '「DCM」を 工具器具備品 へ寄せる候補',
+                    ],
+                },
+            },
+        ],
+    },
+    worker: {
+        summary: '担当 3 件',
+        items: [
+            {
+                id: 'w1',
+                name: 'Pat登美ヶ丘第2駐車場',
+                meta: '株式会社サンプル商事 / 700円',
+                badge: '確認中',
+                badgeClass: 'status-ai_analyzing',
+                detail: {
+                    image: 'receipt_001.png',
+                    fields: [
+                        ['店舗名', 'Pat登美ヶ丘第2駐車場'],
+                        ['金額', '700'],
+                        ['支払方法', '現金'],
+                        ['勘定科目', '旅費交通費'],
+                        ['請求区分', '対象外'],
+                    ],
+                    actions: ['確認完了', '差し戻し', '次へ'],
+                    note: 'AI 初期値の会議費を旅費交通費へ修正済み。',
+                },
+            },
+            {
+                id: 'w2',
+                name: 'びっくりドンキー',
+                meta: '株式会社サンプル商事 / 4,860円',
+                badge: '要確認',
+                badgeClass: 'status-failed',
+                detail: {
+                    image: 'receipt_005.png',
+                    fields: [
+                        ['店舗名', 'びっくりドンキー'],
+                        ['金額', '4,860'],
+                        ['支払方法', 'クレジットカード'],
+                        ['勘定科目', '福利厚生費'],
+                        ['請求区分', '対象外'],
+                    ],
+                    actions: ['確認完了', '差し戻し', '保留'],
+                    note: '顧客コメント履歴あり。支払方法の再確認が必要。',
+                },
+            },
+            {
+                id: 'w3',
+                name: '国際自動車',
+                meta: '青葉建設 / 2,340円',
+                badge: '確認待ち',
+                badgeClass: 'status-completed',
+                detail: {
+                    image: 'receipt_003.png',
+                    fields: [
+                        ['店舗名', '国際自動車'],
+                        ['金額', '2,340'],
+                        ['支払方法', '現金'],
+                        ['勘定科目', '旅費交通費'],
+                        ['請求区分', '対象外'],
+                    ],
+                    actions: ['確認開始'],
+                    note: 'まだ未着手のデータです。',
+                },
+            },
+        ],
+    },
+    client: {
+        summary: '確認待ち 2 件',
+        items: [
+            {
+                id: 'c1',
+                name: 'Pat登美ヶ丘第2駐車場',
+                meta: '変更点 1件 / 700円',
+                badge: '勘定科目変更あり',
+                badgeClass: 'status-ai_analyzing',
+                detail: {
+                    image: 'receipt_001.png',
+                    rows: [
+                        ['店舗名', 'Pat登美ヶ丘第2駐車場', 'Pat登美ヶ丘第2駐車場', false],
+                        ['金額', '700', '700', false],
+                        ['勘定科目', '会議費', '旅費交通費', true],
+                        ['支払方法', '現金', '現金', false],
+                    ],
+                    comment: '駐車場なので旅費交通費で問題ありません。今後も同様でお願いします。',
+                },
+            },
+            {
+                id: 'c2',
+                name: 'びっくりドンキー',
+                meta: '変更点 2件 / 4,860円',
+                badge: '支払方法・科目変更',
+                badgeClass: 'status-failed',
+                detail: {
+                    image: 'receipt_005.png',
+                    rows: [
+                        ['店舗名', 'びっくりドンキー', 'びっくりドンキー', false],
+                        ['金額', '4,860', '4,860', false],
+                        ['勘定科目', '会議費', '福利厚生費', true],
+                        ['支払方法', '現金', 'クレジットカード', true],
+                    ],
+                    comment: '福利厚生費で問題ありません。支払方法は法人カードです。',
+                },
+            },
+        ],
+    },
+};
+
+let clientDecisionState = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
+    renderAdmin();
+    renderWorker();
+    renderClient();
+});
+
+function initTabs() {
+    const tabs = document.querySelectorAll('.mock-tab');
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+            tabs.forEach((node) => node.classList.remove('active'));
+            tab.classList.add('active');
+
+            document.querySelectorAll('.mock-panel').forEach((panel) => {
+                panel.classList.toggle('active', panel.dataset.panel === tab.dataset.role);
+            });
+        });
+    });
+}
+
+function renderAdmin(selectedId = mockData.admin.items[0].id) {
+    const list = document.getElementById('admin-list');
+    const detail = document.getElementById('admin-detail');
+    const selected = mockData.admin.items.find((item) => item.id === selectedId) || mockData.admin.items[0];
+
+    document.getElementById('admin-summary').textContent = mockData.admin.summary;
+    list.innerHTML = mockData.admin.items.map((item) => `
+        <button class="mock-list-item ${item.id === selected.id ? 'active' : ''}" type="button" data-admin-id="${item.id}">
+            <strong>${item.name}</strong>
+            <span class="hint">未確認 ${item.counts.pending} / 確認中 ${item.counts.reviewing} / 承認待ち ${item.counts.approval}</span>
+            <span class="status ${item.badgeClass}">${item.status}</span>
+        </button>
+    `).join('');
+
+    detail.innerHTML = `
+        <h3>${selected.detail.title}</h3>
+        <div class="mock-stat-grid">
+            ${selected.detail.cards.map(([label, value]) => `
+                <div class="mock-stat-card">
+                    <span class="mock-kpi-label">${label}</span>
+                    <strong>${value}</strong>
+                </div>
+            `).join('')}
+        </div>
+        <div class="mock-note-block">
+            <h4>運用メモ</h4>
+            ${selected.detail.notes.map((note) => `<p>${note}</p>`).join('')}
+        </div>
+        <div class="mock-note-block">
+            <h4>ルール候補</h4>
+            ${selected.detail.candidates.map((note) => `<p>${note}</p>`).join('')}
+            <div class="form-actions">
+                <button class="btn btn-primary" type="button">候補を承認</button>
+                <button class="btn" type="button">担当追加</button>
+            </div>
+        </div>
+    `;
+
+    list.querySelectorAll('[data-admin-id]').forEach((button) => {
+        button.addEventListener('click', () => renderAdmin(button.dataset.adminId));
+    });
+}
+
+function renderWorker(selectedId = mockData.worker.items[0].id) {
+    const list = document.getElementById('worker-list');
+    const detail = document.getElementById('worker-detail');
+    const selected = mockData.worker.items.find((item) => item.id === selectedId) || mockData.worker.items[0];
+
+    document.getElementById('worker-summary').textContent = mockData.worker.summary;
+    list.innerHTML = mockData.worker.items.map((item) => `
+        <button class="mock-list-item ${item.id === selected.id ? 'active' : ''}" type="button" data-worker-id="${item.id}">
+            <strong>${item.name}</strong>
+            <span class="hint">${item.meta}</span>
+            <span class="status ${item.badgeClass}">${item.badge}</span>
+        </button>
+    `).join('');
+
+    detail.innerHTML = `
+        <div class="mock-worker-detail-layout">
+            <div class="mock-image-frame"><div class="mock-image-placeholder">${selected.detail.image}</div></div>
+            <div>
+                <div class="mock-field-list">
+                    ${selected.detail.fields.map(([label, value]) => `
+                        <div class="mock-field-row">
+                            <span class="mock-kpi-label">${label}</span>
+                            <strong>${value}</strong>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="mock-note-block">
+                    <h4>作業メモ</h4>
+                    <p>${selected.detail.note}</p>
+                </div>
+                <div class="form-actions">
+                    ${selected.detail.actions.map((action) => `<button class="btn ${action === '確認完了' ? 'btn-primary' : ''}" type="button">${action}</button>`).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+
+    list.querySelectorAll('[data-worker-id]').forEach((button) => {
+        button.addEventListener('click', () => renderWorker(button.dataset.workerId));
+    });
+}
+
+function renderClient(selectedId = mockData.client.items[0].id) {
+    const list = document.getElementById('client-list');
+    const detail = document.getElementById('client-detail');
+    const selected = mockData.client.items.find((item) => item.id === selectedId) || mockData.client.items[0];
+    const decision = clientDecisionState[selected.id] || '未確認';
+
+    document.getElementById('client-summary').textContent = mockData.client.summary;
+    list.innerHTML = mockData.client.items.map((item) => `
+        <button class="mock-list-item ${item.id === selected.id ? 'active' : ''}" type="button" data-client-id="${item.id}">
+            <strong>${item.name}</strong>
+            <span class="hint">${item.meta}</span>
+            <span class="status ${item.badgeClass}">${clientDecisionState[item.id] || item.badge}</span>
+        </button>
+    `).join('');
+
+    detail.innerHTML = `
+        <div class="mock-client-detail-layout">
+            <div class="mock-image-frame"><div class="mock-image-placeholder">${selected.detail.image}</div></div>
+            <div>
+                <div class="client-diff-table">
+                    <div class="client-diff-row client-diff-head">
+                        <span>項目</span>
+                        <span>AI初期値</span>
+                        <span>御社確認後</span>
+                    </div>
+                    ${selected.detail.rows.map(([label, before, after, changed]) => `
+                        <div class="client-diff-row ${changed ? 'client-diff-changed' : ''}">
+                            <span>${label}</span>
+                            <span>${before}</span>
+                            <span>${after}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="client-comment-box">
+                    <label>お客様コメント</label>
+                    <textarea rows="4" id="client-comment">${selected.detail.comment}</textarea>
+                </div>
+                <div class="mock-note-block">
+                    <h4>現在の状態</h4>
+                    <p id="client-decision-text">${decision}</p>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" type="button" id="client-approve">この内容で承認</button>
+                    <button class="btn" type="button" id="client-return">修正依頼を出す</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    list.querySelectorAll('[data-client-id]').forEach((button) => {
+        button.addEventListener('click', () => renderClient(button.dataset.clientId));
+    });
+
+    document.getElementById('client-approve').addEventListener('click', () => {
+        clientDecisionState[selected.id] = '承認済み';
+        renderClient(selected.id);
+    });
+
+    document.getElementById('client-return').addEventListener('click', () => {
+        clientDecisionState[selected.id] = '修正依頼済み';
+        renderClient(selected.id);
+    });
+}
+</script>
+{% endblock %}

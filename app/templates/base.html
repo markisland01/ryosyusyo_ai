@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}経理書類スキャンAI{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="/" class="logo">経理書類スキャンAI</a>
+            <nav>
+                <a href="/">履歴</a>
+                <a href="/upload">通常スキャン</a>
+                <a href="/upload/long-receipt">長いレシート</a>
+                <a href="/rules">ルール設定</a>
+                <a href="/mock-suite">モック集</a>
+            </nav>
+        </div>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

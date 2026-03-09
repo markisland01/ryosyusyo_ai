@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}運用モック - 経理書類スキャンAI{% endblock %}
+
+{% block content %}
+<section class="mock-hero">
+    <div>
+        <h1>確認代行サービス画面モック</h1>
+        <p class="hint">お客様は撮影のみ、在宅ワーカーが一次確認、管理者が最終承認する前提の画面モックです。</p>
+    </div>
+    <div class="actions">
+        <a href="/upload" class="btn btn-primary">顧客アップロード画面</a>
+        <a href="/rules" class="btn">ルール設定</a>
+    </div>
+</section>
+
+<section class="mock-layout">
+    <article class="card mock-sidebar">
+        <h2>管理メニュー</h2>
+        <div class="mock-nav">
+            <a class="mock-nav-item active" href="#">未確認キュー</a>
+            <a class="mock-nav-item" href="#">承認待ち</a>
+            <a class="mock-nav-item" href="#">顧客別ルール</a>
+            <a class="mock-nav-item" href="#">ルール候補</a>
+            <a class="mock-nav-item" href="#">修正履歴</a>
+            <a class="mock-nav-item" href="#">納品管理</a>
+        </div>
+
+        <h2>今日の状況</h2>
+        <div class="mock-kpis">
+            <div class="mock-kpi">
+                <span class="mock-kpi-label">未確認</span>
+                <strong>84件</strong>
+            </div>
+            <div class="mock-kpi">
+                <span class="mock-kpi-label">確認中</span>
+                <strong>19件</strong>
+            </div>
+            <div class="mock-kpi">
+                <span class="mock-kpi-label">承認待ち</span>
+                <strong>12件</strong>
+            </div>
+            <div class="mock-kpi">
+                <span class="mock-kpi-label">本日納品</span>
+                <strong>231件</strong>
+            </div>
+        </div>
+    </article>
+
+    <div class="mock-main">
+        <article class="card">
+            <div class="mock-toolbar">
+                <div>
+                    <h2>管理者ダッシュボード</h2>
+                    <p class="hint">顧客別の滞留、承認待ち、ルール候補を横断して確認する画面。</p>
+                </div>
+                <div class="mock-filter-row">
+                    <span class="mock-pill">全顧客</span>
+                    <span class="mock-pill">本日分</span>
+                    <span class="mock-pill">差し戻しあり</span>
+                </div>
+            </div>
+
+            <div class="mock-table">
+                <div class="mock-table-row mock-table-head">
+                    <span>顧客</span>
+                    <span>未確認</span>
+                    <span>確認中</span>
+                    <span>承認待ち</span>
+                    <span>担当者</span>
+                    <span>状態</span>
+                </div>
+                <div class="mock-table-row">
+                    <span>株式会社サンプル商事</span>
+                    <span>26</span>
+                    <span>7</span>
+                    <span>3</span>
+                    <span>山田 / 佐藤</span>
+                    <span><span class="status status-ai_analyzing">滞留注意</span></span>
+                </div>
+                <div class="mock-table-row">
+                    <span>西日本フードサービス</span>
+                    <span>18</span>
+                    <span>4</span>
+                    <span>1</span>
+                    <span>高橋</span>
+                    <span><span class="status status-completed">順調</span></span>
+                </div>
+                <div class="mock-table-row">
+                    <span>青葉建設</span>
+                    <span>40</span>
+                    <span>8</span>
+                    <span>6</span>
+                    <span>未割当あり</span>
+                    <span><span class="status status-failed">要調整</span></span>
+                </div>
+            </div>
+        </article>
+
+        <div class="mock-grid">
+            <article class="card">
+                <div class="card-header">
+                    <h2>在宅ワーカー確認画面</h2>
+                    <span class="status status-ai_analyzing">作業中</span>
+                </div>
+                <div class="mock-review-layout">
+                    <div class="mock-image-panel">
+                        <div class="mock-image-frame">
+                            <div class="mock-image-placeholder">receipt_004.png</div>
+                        </div>
+                        <p class="hint">画像を見ながら AI 結果を補正。左に原本、右に入力欄。</p>
+                    </div>
+                    <div class="mock-form-panel">
+                        <div class="mock-field"><label>店舗名</label><input value="Pat登美ヶ丘第2駐車場" readonly></div>
+                        <div class="mock-field"><label>金額</label><input value="700" readonly></div>
+                        <div class="mock-field"><label>支払方法</label><input value="現金" readonly></div>
+                        <div class="mock-field"><label>勘定科目</label><input value="旅費交通費" readonly></div>
+                        <div class="mock-field"><label>確認メモ</label><input value="AI結果で問題なし" readonly></div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="button">確認完了</button>
+                            <button class="btn" type="button">差し戻し</button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="card">
+                <div class="card-header">
+                    <h2>ルール候補</h2>
+                    <span class="status status-completed">3件</span>
+                </div>
+                <div class="mock-rule-candidates">
+                    <div class="mock-candidate">
+                        <strong>株式会社サンプル商事</strong>
+                        <p>「びっくりドンキー」を 4 回連続で `会議費 → 福利厚生費` に修正</p>
+                        <div class="card-actions">
+                            <button class="btn btn-sm">ルール化</button>
+                            <button class="btn btn-sm">保留</button>
+                        </div>
+                    </div>
+                    <div class="mock-candidate">
+                        <strong>青葉建設</strong>
+                        <p>「コーナン」「DCM」を 6 回連続で `消耗品費 → 工具器具備品` に修正</p>
+                        <div class="card-actions">
+                            <button class="btn btn-sm">ルール化</button>
+                            <button class="btn btn-sm">保留</button>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </div>
+</section>
+{% endblock %}
