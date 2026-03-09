@@ -88,7 +88,8 @@
                     </div>
                     <div class="form-group">
                         <label>勘定科目</label>
-                        <input type="text" id="edit-account" name="account_category">
+                        <input type="text" id="edit-account" name="account_category" list="account-category-options" autocomplete="off">
+                        <datalist id="account-category-options"></datalist>
                     </div>
                     <div class="form-group">
                         <label>登録番号</label>
@@ -113,8 +114,11 @@
 <script>
 const videoId = {{ video_id }};
 let receipts = [];
+let accountCategoryOptions = [];
 
-document.addEventListener('DOMContentLoaded', loadReceipts);
+document.addEventListener('DOMContentLoaded', async () => {
+    await Promise.all([loadReceipts(), loadAccountCategoryOptions()]);
+});
 
 function receiptImagePath(index) {
     return `/outputs/${videoId}/receipt_${String(index).padStart(3, '0')}.png`;
@@ -205,6 +209,26 @@ async function loadReceipts() {
     } catch {
         container.innerHTML = '<p class="error">データの取得に失敗しました。</p>';
     }
+}
+
+async function loadAccountCategoryOptions() {
+    try {
+        const res = await fetch('/api/receipts/account-categories');
+        if (!res.ok) return;
+
+        const data = await res.json();
+        accountCategoryOptions = Array.isArray(data.account_categories) ? data.account_categories : [];
+        renderAccountCategoryOptions();
+    } catch {
+        accountCategoryOptions = [];
+    }
+}
+
+function renderAccountCategoryOptions() {
+    const datalist = document.getElementById('account-category-options');
+    datalist.innerHTML = accountCategoryOptions
+        .map(value => `<option value="${escapeHtml(value)}"></option>`)
+        .join('');
 }
 
 function openEditModal(receiptId) {
@@ -317,6 +341,15 @@ function exportCSV() {
     const format = document.getElementById('export-format').value;
     const encoding = document.getElementById('export-encoding').value;
     window.location.href = `/api/export/csv?video_id=${videoId}&format=${format}&encoding=${encoding}`;
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
 }
 </script>
 {% endblock %}

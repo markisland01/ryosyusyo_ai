@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.receipt import Receipt
+from app.models.rule import Rule
 from app.schemas.receipt import ReceiptConfirmRequest, ReceiptResponse, ReceiptUpdate
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
@@ -36,6 +38,31 @@ def _serialize_receipt(receipt: Receipt) -> dict:
         "is_confirmed": receipt.is_confirmed,
         "created_at": receipt.created_at,
     }
+
+
+@router.get("/account-categories")
+async def list_account_categories(db: AsyncSession = Depends(get_db)):
+    receipt_result = await db.execute(
+        select(Receipt.account_category)
+        .where(Receipt.account_category.is_not(None))
+        .distinct()
+        .order_by(Receipt.account_category.asc())
+    )
+    rule_result = await db.execute(
+        select(Rule.target_value)
+        .where(Rule.rule_type == "account_category", Rule.target_value.is_not(None))
+        .distinct()
+        .order_by(Rule.target_value.asc())
+    )
+
+    candidates = sorted(
+        {
+            value.strip()
+            for value in [*receipt_result.scalars().all(), *rule_result.scalars().all()]
+            if isinstance(value, str) and value.strip()
+        }
+    )
+    return {"account_categories": candidates, "total": len(candidates)}
 
 
 @router.get("/{receipt_id}", response_model=ReceiptResponse)
