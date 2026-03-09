@@ -301,6 +301,40 @@ h2 { font-size: 1.2rem; margin-bottom: 12px; }
     border-radius: var(--radius);
     font-size: 0.9rem;
 }
+.suggest-input-wrap {
+    position: relative;
+}
+.suggestion-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+.suggestion-item {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    color: var(--text);
+    cursor: pointer;
+}
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+.suggestion-item:hover {
+    background: #eff6ff;
+}
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;

@@ -88,8 +88,10 @@
                     </div>
                     <div class="form-group">
                         <label>勘定科目</label>
-                        <input type="text" id="edit-account" name="account_category" list="account-category-options" autocomplete="off">
-                        <datalist id="account-category-options"></datalist>
+                        <div class="suggest-input-wrap">
+                            <input type="text" id="edit-account" name="account_category" autocomplete="off">
+                            <div id="account-category-suggestions" class="suggestion-list" hidden></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>登録番号</label>
@@ -225,10 +227,28 @@ async function loadAccountCategoryOptions() {
 }
 
 function renderAccountCategoryOptions() {
-    const datalist = document.getElementById('account-category-options');
-    datalist.innerHTML = accountCategoryOptions
-        .map(value => `<option value="${escapeHtml(value)}"></option>`)
+    renderAccountCategorySuggestions(document.getElementById('edit-account').value || '');
+}
+
+function renderAccountCategorySuggestions(keyword = '') {
+    const list = document.getElementById('account-category-suggestions');
+    const normalizedKeyword = String(keyword || '').trim().toLowerCase();
+    const filtered = accountCategoryOptions.filter((value) => {
+        if (!normalizedKeyword) return true;
+        return value.toLowerCase().includes(normalizedKeyword);
+    });
+
+    if (filtered.length === 0) {
+        list.hidden = true;
+        list.innerHTML = '';
+        return;
+    }
+
+    list.innerHTML = filtered
+        .slice(0, 20)
+        .map((value) => `<button type="button" class="suggestion-item" data-value="${escapeHtml(value)}">${escapeHtml(value)}</button>`)
         .join('');
+    list.hidden = false;
 }
 
 function openEditModal(receiptId) {
@@ -247,6 +267,7 @@ function openEditModal(receiptId) {
     document.getElementById('edit-reg-number').value = r.registration_number || '';
     document.getElementById('edit-invoice-type').value = r.invoice_type || '';
     document.getElementById('edit-account').value = r.account_category || '';
+    renderAccountCategorySuggestions(r.account_category === 'その他' ? '' : (r.account_category || ''));
     document.getElementById('edit-description').value = r.description || '';
 
     const idx = receipts.indexOf(r);
@@ -293,6 +314,7 @@ function openEditModal(receiptId) {
 
 function closeModal() {
     document.getElementById('edit-modal').style.display = 'none';
+    document.getElementById('account-category-suggestions').hidden = true;
 }
 
 document.getElementById('edit-form').addEventListener('submit', async (e) => {
@@ -351,5 +373,33 @@ function escapeHtml(value) {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
 }
+
+const accountInput = document.getElementById('edit-account');
+const accountSuggestionList = document.getElementById('account-category-suggestions');
+
+accountInput.addEventListener('focus', () => {
+    renderAccountCategorySuggestions(accountInput.value === 'その他' ? '' : accountInput.value);
+});
+
+accountInput.addEventListener('click', () => {
+    renderAccountCategorySuggestions(accountInput.value === 'その他' ? '' : accountInput.value);
+});
+
+accountInput.addEventListener('input', () => {
+    renderAccountCategorySuggestions(accountInput.value);
+});
+
+accountSuggestionList.addEventListener('click', (event) => {
+    const button = event.target.closest('.suggestion-item');
+    if (!button) return;
+    accountInput.value = button.dataset.value || '';
+    accountSuggestionList.hidden = true;
+});
+
+document.addEventListener('click', (event) => {
+    if (!event.target.closest('.suggest-input-wrap')) {
+        accountSuggestionList.hidden = true;
+    }
+});
 </script>
 {% endblock %}
